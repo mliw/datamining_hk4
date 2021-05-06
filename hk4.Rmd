@@ -1,0 +1,488 @@
+---
+title: "ECO395M STAT LEARNING Homework 4" 
+author: "Mingwei Li, Xinyu Leng, Hongjin Long"
+thanks: "Mingwei Li, Xinyu Leng and Hongjin Long are master students of economics, The University of Texas at Austin"
+output:
+  pdf_document: 
+    number_sections: yes
+    includes:
+      in_header: preamble.tex
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+\begin{abstract}
+This document is the fourth homework of ECO395M STAT LEARNING. 
+\begin{figure}[!htbp]
+	\centering
+	\includegraphics[width=0.85\textwidth]{pics/0.jpg}
+\end{figure}
+\end{abstract}
+
+\newpage
+\tableofcontents
+
+\newpage
+\section{Clustering and PCA}
+We have 6497 observations.
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+library(psych)
+library(factoextra)
+library(ModelMetrics)
+library(nnet)
+wine = read.csv("data/wine.csv", stringsAsFactors=TRUE)
+wine$color = as.numeric(wine$color=="red")
+test_features = wine[,1:11]
+print(dim(wine))
+```
+
+We would discuss 3 cases:
+
+(1) Benchmark model: We fit on the original wine.csv data. logistic model is used to predict color and linear model is used to predict quality. f1-score and rmse are used to measure the quality of fitting.
+
+(2) PCA model V.S Benchmark model: unsupervised technique(PCA) reduce 11 features to only 1 feature($PC_1$). We would use the single feature $PC_1$ to predict color(with logistic model) and to predict quality(with linear model).
+
+(3) kmeans model V.S Benchmark model: unsupervised technique(k-means) reduce 11 features to only 1 feature($class$). We would use the single feature $class$ to predict color(with logistic model) and to predict quality(with linear model).
+
+\newpage
+\subsection{Benchmark Model}
+Details of benchmark model for color:
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+model <- glm(color ~ .-color-quality, family = binomial(), data=wine)
+print(summary(model))
+```
+The f1-score is:
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+fitted_class = predict(model,type = "response")
+# The f1-score is
+print(f1Score(wine$color,fitted_class))
+```
+Details of benchmark model for quality:
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+model <- lm(quality ~ .-color-quality, data=wine)
+print(summary(model))
+```
+The rmse is:
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+fitted_value = predict(model)
+print(rmse(wine$quality,fitted_value))
+```
+
+\newpage
+\subsection{PCA Model}
+The summary of pca is:
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+pca = prcomp(test_features, nfactors=3, rotate="varimax", scores=TRUE,scale = TRUE)
+# The summary of pca is:
+print(summary(pca))
+```
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+pca_data = predict(pca,test_features)
+pca_data = as.data.frame(pca_data)
+pca_data$color = wine$color
+pca_data$quality = wine$quality
+```
+\textbf{(1) $PC_1$ predicts color}
+
+The figure of color V.S $PC_1$ is listed below. $color == 1$ means red wine; $color == 0$ means white wine. We can see $PC_1$ has predictive power for $color$ in this figure. $PC_1$ \textbf{is easily capable of distinguishing the reds from the whites.}
+```{r fig1, fig.width=3,fig.height=3,fig.align = "center",echo=FALSE}
+# color == 1 red
+p0 = ggplot(data=pca_data) + 
+  geom_point(aes(x=PC1, y=color),alpha = 1/40,colour ="blue")
+p0
+```
+Details of pca model for color(1 component):
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+# pca model for color(Only one component)
+model <- glm(color ~ PC1, family = binomial(), data=pca_data)
+print(summary(model))
+```
+The f1-score is:
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+fitted_class = predict(model,type = "response")
+# The f1-score is
+print(f1Score(pca_data$color,fitted_class))
+```
+\textbf{(2) $PC_1$ predicts quality}
+
+The figure of $quality$ V.S $PC_1$ is listed below: $PC_1$ \textbf{is not easily capable of predicting quality}
+```{r fig2, fig.width=3,fig.height=3,fig.align = "center",echo=FALSE,warning=FALSE,message=FALSE}
+# color == 1 red
+p0=ggplot(data = pca_data, aes(x = PC1, y = quality)) + 
+  geom_point(color='blue',alpha = 1/40) +
+  geom_smooth(method = "lm", se = FALSE)
+p0
+```
+
+Details of pca model for quality(Only one component):
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+model <- lm(quality ~PC1, data=pca_data)
+print(summary(model))
+```
+The rmse is:
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+fitted_value = predict(model)
+# The rmse is
+print(rmse(pca_data$quality,fitted_value))
+```
+\newpage
+\subsection{Kmeans Model}
+\textbf{(1) $Kmeans$ predicts color}
+
+The figure of color V.S $new\_cluster$ is listed below. $color == 1$ means red wine; $color == 0$ means white wine. $new\_cluster$ \textbf{is not easily capable of distinguishing the reds from the whites.}
+```{r fig3, fig.width=3,fig.height=3,fig.align = "center",echo=FALSE}
+# color == 1 red
+set.seed(100)
+kmeans_features = kmeans(test_features, centers=2)
+wine$new_cluster = kmeans_features$cluster
+p0 = ggplot(data=wine) + 
+  geom_point(aes(x=new_cluster, y=color),alpha = 1/400,colour ="red")
+p0
+```
+
+Details of kmeans model for color(2 classes):
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+# The details of kmeans model for color(Only two classes)
+model <- glm(color~new_cluster, family = binomial(), data=wine)
+print(summary(model))
+```
+The f1-score is :
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+fitted_class = predict(model,type = "response")
+# The f1-score is
+print(f1Score(wine$color,fitted_class))
+```
+\textbf{(2) $Kmeans$ predicts quality}
+
+The figure of $quality$ V.S $new\_cluster$ is listed below.$new\_cluster$ \textbf{is not easily capable of predicting quality.}
+```{r fig4, fig.width=3,fig.height=3,fig.align = "center",echo=FALSE,warning=FALSE,message=FALSE}
+# color == 1 red
+p0=ggplot(data = wine, aes(x = new_cluster, y = quality)) + 
+  geom_point(color='red',alpha = 1/40) +
+  geom_smooth(method = "lm", se = FALSE)
+p0
+```
+Details of kmeans model for quality:
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+model <- lm(quality ~ new_cluster, data=wine)
+print(summary(model))
+```
+The rmse is :
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+fitted_value = predict(model)
+# The rmse is
+print(rmse(wine$quality,fitted_value))
+```
+\newpage
+\subsection{Results and Conclusions}
+
+The results of different models are listed in table \ref{table:1}.
+\begin{table}[!htbp]
+\caption{Comparision between Models}
+\vspace{-15pt}
+\footnotesize
+\begin{center}
+\begin{tabular}{ccc}
+\hline
+                         & f1-score(color classification) & rmse(quality prediction) \\ \hline
+Benchmark Model          & 0.9896714                      & 0.7346533                \\
+PCA Model(One component) & 0.9538267                      & 0.8706529                \\
+Kmeans Model(2 classes)  & 0.6870887                      & 0.8731613                \\ \hline
+\end{tabular}
+\end{center}
+\label{table:1}
+\end{table}
+Our target is to see whether the differences in the labels (red/white and quality score) emerge \textbf{naturally} from applying an unsupervised technique to the chemical properties. Therefore, we use One component of PCA and 2 classes of Kmeans Model(Reduce the dimension as much as possible), to reflect \textbf{naturally}.
+
+From table \ref{table:1}, we can see PCA Model(One component) and Kmeans Model(2 classes) performs equally well in quality prediction, and they are both worse than Benchmark Model.
+
+As for color classification, PCA Model(One component)(0.9538267) is much better than Kmeans Model(2 classes)(0.6870887), as Kmeans Model(2 classes) deletes too much information.
+
+PCA technique makes more sense to me for this data!
+
+\textbf{PCA technique is easily capable of distinguishing red from white; PCA technique is NOT easily capable of predicting quality. Kmeans technique is Not easily capable of distinguishing red from white; Kmeans technique is NOT easily capable of predicting quality.}
+
+\newpage
+\section{Market segmentation}
+
+We define a group of correlated interests as market segment.
+
+There are 4 unwanted categories "chatter","uncategorized","adult","spam", and we delete them first. 32 features are left after deletion. Then we calculate the correlation matrix$(32\times 32)$ of these features.
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+library(ggplot2)
+library(corrplot)
+social_marketing <- read.csv("data/social_marketing.csv", stringsAsFactors=TRUE,row.names=1)
+# data pre-processing
+# There are 4 unwanted categories "chatter","uncategorized","adult","spam", we delete them.
+myvars<- names(social_marketing) %in% c("chatter","uncategorized","adult","spam")
+newdata<- social_marketing[!myvars]
+# Find correlation
+mcor <- cor(newdata) # 计算相关矩阵并赋值给mcor
+mcor = round(mcor, digits = 2) # 保留两位小数
+```
+We define $correlation\geq0.5 \Rightarrow$ 2 features($f_1,f_2$)are similar $\Rightarrow f_1\sim f_2$. We also define if $f_1\sim f_2,f_2\sim f_3$, then $f_1\sim f_3$. We connect them together and get 5 clusters. Features out of these 5 clusters are deleted for simplicity.
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+# Link matrix
+link = mcor>=0.5
+for (i in 1:dim(link)[1]){
+  link[i,i]=FALSE
+}
+result = list()
+for (name in colnames(link)){
+  if (sum(link[,name])>1){
+    tem = c(name,rownames(link)[link[,name]])
+    result[[name]] <- tem
+  }
+}
+```
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+s1 = c("travel","politics","computers","news","automotive")
+s2 = c("sports_fandom","food","religion","parenting","school")
+s3 = c("health_nutrition","outdoors","personal_fitness")
+s4 = c("college_uni","online_gaming","sports_playing")
+s5 = c("cooking","beauty","fashion")
+```
+Segmentations and advice are listed in table \ref{table:2}.
+\begin{table}[!htbp]
+\caption{Segmentations and Advice}
+\vspace{-15pt}
+\footnotesize
+\begin{center}
+\begin{tabular}{ccc}
+\hline
+Segmentations                                                  & Description                             & Advice                             \\ \hline
+"travel","politics","computers","news","automotive"     & middle-aged man who like traveling      & our drink relax yourselves         \\
+"sports\_fandom","food","religion","parenting","school" & Young parents who raise their kids      & our drink is good for kids         \\
+"health\_nutrition","outdoors","personal\_fitness"      & Old people who care about their health  & our drink is good for health       \\
+"college\_uni","online\_gaming","sports\_playing"       & Young students worry about their study. & our drink gives you energy         \\
+"cooking","beauty","fashion"                            & Fashionable woman                       & our drink makes you more beautiful \\ \hline
+\end{tabular}
+\end{center}
+\label{table:2}
+\end{table}
+Mean-values of number of posts of different groups are listed below. People who post more frequently than mean-value of certain group can be classified as that group.
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+tem = newdata[,s1]
+print("group 1")
+print(apply(tem,2,mean))
+tem = newdata[,s2]
+print("group 2")
+print(apply(tem,2,mean))
+tem = newdata[,s3]
+print("group 3")
+print(apply(tem,2,mean))
+tem = newdata[,s4]
+print("group 4")
+print(apply(tem,2,mean))
+tem = newdata[,s5]
+print("group 5")
+print(apply(tem,2,mean))
+```
+
+\newpage
+\section{Association rules for grocery purchases}
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+library(tidyverse)
+library(arules)  # has a big ecosystem of packages built around it
+library(arulesViz)
+library(igraph)
+
+# line is all basket
+fileName="data/groceries.txt"
+con=file(fileName,open="r")
+line=readLines(con)
+close(con)
+
+# Split lines get variable baskets
+baskets = list()
+total_length = length(line)
+for (i in 1:total_length){
+  baskets[[i]]=strsplit(line[[i]], ",")[[1]]
+}
+baskets = lapply(baskets, unique)
+# arules "transactions" class.
+playtrans = as(baskets, "transactions")
+
+# Now run the 'apriori' algorithm
+###############musicrules = apriori(playtrans,
+###############parameter=list(support=.005, confidence=.1, maxlen=2))
+# Pick your own thresholds for lift and confidence;
+# just be clear what these thresholds are and how you picked them.
+# Do your discovered item sets make sense?
+# Present your discoveries in an interesting and concise way.
+
+# graph-based visualization
+#sub1 = subset(musicrules, subset=lift > 2 & confidence > 0.3)
+```
+\textbf{Pick your own thresholds for lift and confidence}
+$$
+lift_{threshold}=2,confidence_{threshold}=0.3
+$$
+\textbf{just be clear what these thresholds are and how you picked them.}
+
+I pick them in order to leave about 100 rules
+$$
+lift(X\rightarrow Y) = \frac{P(Y|X)}{P(Y)}>2\quad Confidence(X\rightarrow Y) = \frac{P(XY)}{P(X)}>0.30
+$$
+\textbf{Do your discovered item sets make sense? Present your discoveries in an interesting and concise way.}
+
+I believe item sets make sense, just look at the following figure.
+
+(1) Those milk products point to "yogurt."
+
+(2) A lot of foods like meat, fruits and vegetables point to "other vegetables".
+
+(3) The rules in the following figure are totally consisted of foods.
+\begin{figure}[!htbp]
+	\centering
+	\includegraphics[width=0.6\textwidth]{pics/Q3_rule.png}
+\end{figure}
+
+\newpage
+\section{Author attribution}
+
+Text data requires lots of preprocessing. This section is divided into 2 parts. Part 1: Preprocess data; Part 2: Model evaluation.
+
+\textbf{Note: In order to save time, the code of this part has been annotated.}
+
+\subsection{Part 1: Preprocess data}
+
+Train data: 50 authors and 50 essays for each author.
+
+Test data: 50 authors and 50 essays for each author. 
+
+A part of Author names are as follows:
+\begin{figure}[!htbp]
+	\centering
+	\includegraphics[width=0.4\textwidth]{pics/Q4_authorname.JPG}
+\end{figure}
+A part of essay is as follows:
+
+\textit{nvestors smiled on the bourses of central and eastern Europe as brightly as the summer sun this week, though there were some indications these may by little more than fair-weather friends to the markets.
+Exchanges in Prague, Warsaw, Budapest, Bratislava and Bucharest all gained ground, while Zagreb and Sofia traded mixed. Ljubljana was the one gray cloud, posting slight losses.
+The Central European Share Index (CESI) which reflects the price movements of 50 selected Czech, Polish and Hungarian shares, firmed 66.11 points.
+PRAGUE}
+
+Data preprocess is as follows:
+
+(1) We load the train data as a data frame which associates authors and essays together.
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+# library(readtext)
+# library(tm) 
+# library(caret) 
+# library(kernlab)
+# library(kknn)
+# library(e1071)
+# # 1 Load and preprocess data
+# author_list = list.dirs("Data/ReutersC50/C50train")
+# author_list = author_list[2:length(author_list)]
+# split_str = function(x) {
+#   tem_str = strsplit(x, "/")[[1]]
+#   return(tem_str[length(tem_str)])
+# }
+# for (i in 1:length(author_list)){
+#   author_list[i]=split_str(author_list[i])
+# }
+# train_data = data.frame()
+# test_data = data.frame()
+# for (name in author_list){
+#   tem_train = readtext(paste0("Data/ReutersC50/C50train/",name,"/*"),dvsep = "\n")
+#   tem_test = readtext(paste0("Data/ReutersC50/C50test/",name,"/*"),dvsep = "\n")
+#   
+#   tem_train_data = data.frame(tem_train$text)
+#   tem_train_data$author = name
+#   train_data = rbind(train_data,tem_train_data)
+#   
+#   tem_test_data = data.frame(tem_test$text)
+#   tem_test_data$author = name
+#   test_data = rbind(test_data,tem_test_data)
+# }
+# train_data$author <- as.factor(train_data$author)
+# test_data$author <- as.factor(test_data$author)
+# colnames(train_data) = c("text","author")
+# colnames(test_data) = c("text","author")
+```
+\begin{figure}[!htbp]
+	\centering
+	\includegraphics[width=0.4\textwidth]{pics/Q4_dataframe.JPG}
+\end{figure}
+(2) We remove Punctuation, stopwords, numbers and Whitespace. In addition, all letters are changed to lower case.
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+# # Preprocess data
+# # Creating Corpus
+# train_data_corpus =  Corpus(VectorSource(train_data$text))
+# test_data_corpus =  Corpus(VectorSource(test_data$text))
+# 
+# # Clean data
+# train_data_corpus_clean = tm_map(train_data_corpus, tolower)
+# train_data_corpus_clean = tm_map(train_data_corpus_clean, removePunctuation)
+# train_data_corpus_clean = tm_map(train_data_corpus_clean, removeWords, stopwords())
+# train_data_corpus_clean = tm_map(train_data_corpus_clean, removeNumbers)
+# train_data_corpus_clean = tm_map(train_data_corpus_clean, stripWhitespace)
+# 
+# test_data_corpus_clean = tm_map(test_data_corpus, tolower)
+# test_data_corpus_clean = tm_map(test_data_corpus_clean, removePunctuation)
+# test_data_corpus_clean = tm_map(test_data_corpus_clean, removeWords, stopwords())
+# test_data_corpus_clean = tm_map(test_data_corpus_clean, removeNumbers)
+# test_data_corpus_clean = tm_map(test_data_corpus_clean, stripWhitespace)
+```
+(3) Some words in test data set may not appear in train data. In order to address this problem, we select common_words.
+$$
+common\_words= words\_of\_train\_data\cap words\_of\_test\_data    
+$$
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+# # Change to matrix
+# train_mat = DocumentTermMatrix(train_data_corpus_clean)
+# freq_words = findFreqTerms(train_mat,5) # Select a part of words
+# train_mat = DocumentTermMatrix(train_data_corpus_clean, list(freq_words))
+# test_mat = DocumentTermMatrix(test_data_corpus_clean, list(freq_words))
+# 
+# # Convert x
+# trans_matrix = function(x) {
+#   return(x)
+# }
+# # train_mat_data test_mat_data
+# train_mat_data = apply(train_mat, MARGIN = 2, trans_matrix)
+# test_mat_data = apply(test_mat, MARGIN = 2, trans_matrix)
+# # Use common_names
+# colname_test_mat = colnames(test_mat_data)
+# common_names = intersect(freq_words,colname_test_mat)
+# train_mat_data = train_mat_data[,common_names]
+# test_mat_data = test_mat_data[,common_names]
+```
+(4) Finally, one-hot coding is adopted. It converts numerical value to "True" and "False". Just like the following figures.
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+# one-hot coding
+# onehot = function(x) {
+#   x = ifelse(x > 0, 1, 0)
+#   x = factor(x, levels = c(0, 1), labels = c("False", "True")) 
+#   return(x)
+# }
+# train_mat_data = apply(train_mat_data, MARGIN = 2, onehot)
+# test_mat_data = apply(test_mat_data, MARGIN = 2, onehot)
+```
+\begin{figure}[!htbp]
+	\centering
+	\includegraphics[width=0.4\textwidth]{pics/Q4_numerical_data.JPG}
+\end{figure}
+\begin{figure}[!htbp]
+	\centering
+	\includegraphics[width=0.4\textwidth]{pics/Q4_onehot_data.JPG}
+\end{figure}
+
+\subsection{Part 2:Model evaluation}
+
+Many models have been tried. However, due to the size of our data, only Naive Bayesian Model can effectively fit on the data and make prediction.
+
+The accuracy on test data is 67.4\%.
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+# # Fitting
+# data_classifier = naiveBayes(train_mat_data, train_data$author)
+# 
+# # predicting
+# data_test_pred = predict(data_classifier, test_mat_data)
+# accuracy = mean(data_test_pred == test_data$author)
+# print(accuracy)
+```

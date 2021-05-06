@@ -1,0 +1,10 @@
+\contentsline {section}{\numberline {1}Clustering and PCA}{3}{section.1}%
+\contentsline {subsection}{\numberline {1.1}Benchmark Model}{4}{subsection.1.1}%
+\contentsline {subsection}{\numberline {1.2}PCA Model}{6}{subsection.1.2}%
+\contentsline {subsection}{\numberline {1.3}Kmeans Model}{9}{subsection.1.3}%
+\contentsline {subsection}{\numberline {1.4}Results and Conclusions}{11}{subsection.1.4}%
+\contentsline {section}{\numberline {2}Market segmentation}{12}{section.2}%
+\contentsline {section}{\numberline {3}Association rules for grocery purchases}{13}{section.3}%
+\contentsline {section}{\numberline {4}Author attribution}{14}{section.4}%
+\contentsline {subsection}{\numberline {4.1}Part 1: Preprocess data}{14}{subsection.4.1}%
+\contentsline {subsection}{\numberline {4.2}Part 2:Model evaluation}{15}{subsection.4.2}%
